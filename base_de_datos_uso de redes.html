@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Datos de encuesta - Vista y descarga</title>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:24px;background:#f7fafc;color:#0f172a}
+    h1{font-size:1.4rem;margin-bottom:8px}
+    p{margin-top:0;color:#475569}
+    table{border-collapse:collapse;width:100%;margin-top:12px;background:#fff;border-radius:8px;overflow:hidden}
+    th,td{padding:8px 10px;border-bottom:1px solid #e6eef6;text-align:center}
+    th{background:#eef2ff;color:#0b1220}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    button{background:#0ea5a4;border:none;padding:8px 12px;border-radius:6px;color:white;cursor:pointer}
+    button.secondary{background:#64748b}
+    .note{font-size:0.9rem;color:#64748b;margin-top:10px}
+    textarea{width:100%;height:120px;margin-top:12px;padding:8px;border-radius:6px;border:1px solid #e2e8f0}
+    .small{font-size:0.85rem;color:#334155}
+  </style>
+</head>
+<body>
+  <h1>Datos de encuesta (Uso de redes vs Ansiedad percibida)</h1>
+  <p>Tabla con 30 observaciones. Puedes editar los datos directamente, descargarlos como CSV o copiar un enlace de datos para compartir.</p>
+
+  <div class="controls">
+    <button id="downloadCsv">Descargar CSV</button>
+    <button id="copyDataLink" class="secondary">Copiar enlace de datos (data URL)</button>
+    <button id="copyRawJson" class="secondary">Copiar JSON al portapapeles</button>
+  </div>
+
+  <table id="dataTable" aria-label="Tabla de datos">
+    <thead>
+      <tr><th>Nº</th><th>Uso de redes (horas/día)</th><th>Ansiedad (0–100)</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <p class="note">Si quieres un enlace permanente para trabajar con los datos en otra herramienta, sigue las instrucciones de hosting (GitHub Gist / GitHub Pages) que están al final de la página.</p>
+
+  <h3>JSON de los datos (editable)</h3>
+  <textarea id="jsonArea"></textarea>
+  <p class="small">Edita el JSON y luego presiona <em>Descargar CSV</em> para bajar la versión actualizada.</p>
+
+  <h3>Instrucciones rápidas para obtener un link permanente</h3>
+  <ol>
+    <li>Sube este archivo HTML a un <strong>Gist</strong> en <a href="https://gist.github.com" target="_blank">gist.github.com</a> y copia la URL "Raw" — o</li>
+    <li>Sube a un repositorio en GitHub y activa <strong>GitHub Pages</strong> en la rama <code>main</code> para obtener un enlace tipo <code>https://tuusuario.github.io/repo/archivo.html</code>.</li>
+  </ol>
+
+  <script>
+    // Datos iniciales (del ejemplo de encuesta)
+    const data = [
+      {id:1, uso:1, ans:25}, {id:2, uso:2, ans:30}, {id:3, uso:3, ans:40}, {id:4, uso:4, ans:46}, {id:5, uso:5, ans:55},
+      {id:6, uso:6, ans:60}, {id:7, uso:7, ans:65}, {id:8, uso:8, ans:70}, {id:9, uso:2, ans:32}, {id:10, uso:3, ans:38},
+      {id:11, uso:4, ans:45}, {id:12, uso:5, ans:53}, {id:13, uso:6, ans:62}, {id:14, uso:7, ans:67}, {id:15, uso:8, ans:72},
+      {id:16, uso:1, ans:20}, {id:17, uso:2, ans:28}, {id:18, uso:3, ans:36}, {id:19, uso:4, ans:44}, {id:20, uso:5, ans:52},
+      {id:21, uso:6, ans:59}, {id:22, uso:7, ans:66}, {id:23, uso:8, ans:71}, {id:24, uso:2, ans:29}, {id:25, uso:3, ans:37},
+      {id:26, uso:5, ans:54}, {id:27, uso:6, ans:61}, {id:28, uso:7, ans:68}, {id:29, uso:8, ans:73}, {id:30, uso:4, ans:47}
+    ];
+
+    const tbody = document.querySelector('#dataTable tbody');
+    const jsonArea = document.getElementById('jsonArea');
+
+    function renderTable(arr){
+      tbody.innerHTML = '';
+      arr.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.id}</td>
+                        <td contenteditable="true" data-field="uso">${row.uso}</td>
+                        <td contenteditable="true" data-field="ans">${row.ans}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function readTableToData(){
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const out = rows.map(r => {
+        const id = Number(r.children[0].textContent.trim());
+        const uso = Number(r.children[1].textContent.trim());
+        const ans = Number(r.children[2].textContent.trim());
+        return {id, uso, ans};
+      });
+      return out;
+    }
+
+    function updateJsonArea(arr){
+      jsonArea.value = JSON.stringify(arr, null, 2);
+    }
+
+    // Inicial
+    renderTable(data);
+    updateJsonArea(data);
+
+    // Si el usuario edita el textarea, actualizar la tabla (intento de parse)
+    jsonArea.addEventListener('blur', ()=>{
+      try{
+        const parsed = JSON.parse(jsonArea.value);
+        if(Array.isArray(parsed)){
+          renderTable(parsed);
+        }
+      }catch(e){
+        // no hacer nada
+      }
+    });
+
+    // Si el usuario edita la tabla (contenteditable), sincronizar al perder foco
+    tbody.addEventListener('focusout', ()=>{
+      const newData = readTableToData();
+      updateJsonArea(newData);
+    });
+
+    // Generar CSV simple
+    function toCSV(arr){
+      const header = ['id','uso_horas_dia','ansiedad_0_100'];
+      const lines = [header.join(',')];
+      arr.forEach(r => {
+        lines.push([r.id, r.uso, r.ans].join(','));
+      });
+      return lines.join('\n');
+    }
+
+    document.getElementById('downloadCsv').addEventListener('click', ()=>{
+      // tomar datos actuales de la tabla
+      const arr = readTableToData();
+      const csv = toCSV(arr);
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'datos_encuesta.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Copiar enlace de datos (data URL con CSV) al portapapeles
+    document.getElementById('copyDataLink').addEventListener('click', async ()=>{
+      const arr = readTableToData();
+      const csv = toCSV(arr);
+      // crear data URL (base64) para que pueda pegarse en otras herramientas directamente
+      try{
+        const b64 = btoa(unescape(encodeURIComponent(csv)));
+        const dataUrl = `data:text/csv;base64,${b64}`;
+        await navigator.clipboard.writeText(dataUrl);
+        alert('Enlace de datos (data URL) copiado al portapapeles. Pégalo donde quieras.');
+      }catch(e){
+        alert('No fue posible copiar el enlace directamente. Puedes descargar el CSV y subirlo a un servicio de hosting.');
+      }
+    });
+
+    // Copiar JSON raw
+    document.getElementById('copyRawJson').addEventListener('click', async ()=>{
+      const arr = readTableToData();
+      const json = JSON.stringify(arr);
+      try{
+        await navigator.clipboard.writeText(json);
+        alert('JSON copiado al portapapeles.');
+      }catch(e){
+        alert('No se pudo copiar el JSON automáticamente. Selecciona y copia el contenido del cuadro.');
+      }
+    });
+  </script>
+</body>
+</html>
